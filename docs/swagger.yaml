@@ -1,0 +1,40 @@
+definitions:
+  dto.UserLoginDTO:
+    properties:
+      name:
+        type: string
+      password:
+        type: string
+    required:
+    - name
+    - password
+    type: object
+info:
+  contact: {}
+  description: 還在開發中...
+  title: Tabinote API
+  version: 0.0.1
+paths:
+  /api/v1/user/login:
+    post:
+      description: 用戶登入詳情描述
+      parameters:
+      - description: payload
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UserLoginDTO'
+      responses:
+        "200":
+          description: 登入成功
+          schema:
+            type: string
+        "401":
+          description: 登入失敗
+          schema:
+            type: string
+      summary: 用戶登入
+      tags:
+      - 用戶管理
+swagger: "2.0"

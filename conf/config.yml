@@ -1,0 +1,8 @@
+
+jwt:
+  tokenExpired_min: 30 # token有效時間  單位是分鐘
+
+  logger:
+    maxSize_MB: 1 #日誌文件檔案大小上限 超過的話自動分割
+    maxBackups: 30 #保留舊文件的最大數量
+    maxAge: 90 #保留舊文件的最大天數

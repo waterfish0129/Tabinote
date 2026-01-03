@@ -32,7 +32,8 @@ func IntiConfig() {
 
 func GetServerPort() string {
 	//給Railway讀的
-	if port := os.Getenv("PORT"); port != "" {
+	if port := os.Getenv("SERVER_PORT"); port != "" {
+		fmt.Println("有讀到環境變數")
 		return port
 	}
 

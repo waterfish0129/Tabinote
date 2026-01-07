@@ -1,10 +1,13 @@
 package utils
 
-import "fmt"
+import "github.com/jackc/pgx/v5/pgtype"
 
-func AppendError(existErr, newErr error) error {
-	if existErr == nil {
-		return newErr
+func StringPtr(s string) *string {
+	return &s
+}
+func ToPgText(s *string) pgtype.Text {
+	if s == nil {
+		return pgtype.Text{Valid: false}
 	}
-	return fmt.Errorf("%v, %w", existErr, newErr)
+	return pgtype.Text{String: *s, Valid: true}
 }

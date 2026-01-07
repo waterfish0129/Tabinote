@@ -26,17 +26,18 @@ func IntiConfig() {
 	if err != nil {
 		panic(fmt.Sprintf("Fatal error config file: %s \n", err))
 	}
-
-	fmt.Println(viper.GetString("server.port"))
 }
 
 func GetServerPort() string {
 	//給Railway讀的
 	if port := os.Getenv("SERVER_PORT"); port != "" {
-		fmt.Println("有讀到環境變數")
 		return port
 	}
 
 	// fallback to config
-	return viper.GetString("server.port")
+	if port := viper.GetString("server.port"); port != "" {
+		return port
+	}
+
+	return "8087"
 }

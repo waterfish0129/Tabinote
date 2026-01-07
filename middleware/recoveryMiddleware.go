@@ -4,14 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/waterfish0129/Tabinote/api"
 	"github.com/waterfish0129/Tabinote/global"
+	consts "github.com/waterfish0129/Tabinote/global/constants"
 	"go.uber.org/zap"
-)
-
-const (
-	ErrInternal = "INTERNAL_ERROR"
-)
-const (
-	MsgInternalError = "server.internal_error"
 )
 
 func RecoveryMiddleware() gin.HandlerFunc {
@@ -25,17 +19,18 @@ func RecoveryMiddleware() gin.HandlerFunc {
 				global.Logger.Error(
 					"panic recovered",
 					zap.String("request_id", c.GetString("request_id")),
+					zap.String("location", "recoveryMiddleware"),
 					zap.Any("panic", r), //發生錯誤的代碼原因
 					zap.Stack("stack"),  //發生錯誤的代碼位置
 				)
 
 				api.ServerFail(c, api.ResponseJson{
-					Code: ErrInternal,
-					Msg:  MsgInternalError,
+					Code: consts.ErrInternal,
+					Msg:  consts.MsgInternalError,
 				})
 			}
 		}()
 
-		c.Next() // ⚠️ 一定要呼叫
+		c.Next() // 一定要呼叫
 	}
 }

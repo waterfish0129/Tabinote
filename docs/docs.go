@@ -15,13 +15,12 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/v1/user/login": {
+        "/api/v1/auth/google": {
             "post": {
-                "description": "用戶登入詳情描述",
                 "tags": [
-                    "用戶管理"
+                    "Auth"
                 ],
-                "summary": "用戶登入",
+                "summary": "google登入",
                 "parameters": [
                     {
                         "description": "payload",
@@ -29,10 +28,132 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.UserLoginDTO"
+                            "$ref": "#/definitions/dto.GoogleLoginDTO"
                         }
                     }
                 ],
+                "responses": {
+                    "200": {
+                        "description": "成功",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "失敗",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "get my userInfo",
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Me",
+                "responses": {
+                    "200": {
+                        "description": "成功",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "失敗",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/health/db": {
+            "get": {
+                "tags": [
+                    "Health 伺服器狀態檢查"
+                ],
+                "summary": "測試",
+                "responses": {
+                    "200": {
+                        "description": "成功",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "失敗",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/health/parseToken": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Health 伺服器狀態檢查"
+                ],
+                "summary": "測試token解碼",
+                "responses": {
+                    "200": {
+                        "description": "成功",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "失敗",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/health/uuid": {
+            "get": {
+                "tags": [
+                    "Health 伺服器狀態檢查"
+                ],
+                "summary": "生成一個uuid",
+                "responses": {
+                    "200": {
+                        "description": "成功",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "失敗",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/user/login": {
+            "post": {
+                "description": "用戶登入詳情描述",
+                "tags": [
+                    "用戶管理"
+                ],
+                "summary": "用戶登入",
                 "responses": {
                     "200": {
                         "description": "登入成功",
@@ -51,20 +172,24 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "dto.UserLoginDTO": {
+        "dto.GoogleLoginDTO": {
             "type": "object",
             "required": [
-                "name",
-                "password"
+                "idToken"
             ],
             "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "password": {
+                "idToken": {
                     "type": "string"
                 }
             }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "請在輸入框輸入 \"Bearer {你的Token}\"",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`
@@ -76,7 +201,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "Tabinote API",
-	Description:      "還在開發中...",
+	Description:      "Made By Walter.Fish",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

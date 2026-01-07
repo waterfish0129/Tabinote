@@ -10,8 +10,8 @@ func RequestIDMiddleware() gin.HandlerFunc {
 		requestID := c.GetHeader("X-Request-ID")
 
 		if requestID == "" {
-			nanoId, _ := gonanoid.New(10)
-			requestID = "req-" + nanoId
+			nanoId, _ := gonanoid.New(12)
+			requestID = nanoId
 		}
 
 		c.Set("request_id", requestID)

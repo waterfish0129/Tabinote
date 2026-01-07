@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/spf13/viper"
 	"time"
 )
@@ -10,19 +11,19 @@ import (
 var secretKey = viper.GetString("JWT_SECRET")
 
 type MyClaims struct {
-	Uid  uint   `json:"uid"`
-	Role string `json:"role"`
-	Plan string `json:"plan"`
+	UserId string `json:"userId"`
+	Role   string `json:"role"`
+	Plan   string `json:"plan"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(uid uint, role, plan string) (string, error) {
+func GenerateToken(userId uuid.UUID, role, plan string) (string, error) {
 	iMyClaims := MyClaims{
-		Uid:  uid,
-		Role: role,
-		Plan: plan,
+		UserId: userId.String(),
+		Role:   role,
+		Plan:   plan,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(viper.GetDuration("jwt.tokenExpired_min") * time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(GetExpiresIn())),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Subject:   "Token",
 		},
@@ -42,17 +43,9 @@ func ParseToken(tokenString string) (MyClaims, error) {
 		//如果解析沒錯  但是token為非法的 也創一個錯誤給他
 		err = errors.New("invalid token")
 	}
-
-	//switch {
-	//case err == nil && token.Valid:
-	//	//這裡代表是合法token 並且驗證通過
-	//case errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet):
-	//	// Token is either expired or not active yet
-	//	// 這裡表示token超時 要換token
-	//
-	//default:
-	//	fmt.Println("Couldn't handle this token:", err)
-	//}
-
 	return iMyClaims, err
+}
+
+func GetExpiresIn() time.Duration {
+	return viper.GetDuration("jwt.tokenExpired_min") * time.Minute
 }

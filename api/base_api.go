@@ -1,169 +1,139 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/waterfish0129/Tabinote/global"
-	"github.com/waterfish0129/Tabinote/utils"
+	consts "github.com/waterfish0129/Tabinote/global/constants"
 	"go.uber.org/zap"
-)
-
-const (
-	ErrBindingType     = "BINDING_TYPE_ERROR"
-	ErrBindingValidate = "BINDING_VALIDATE_ERROR"
-	ErrBinding         = "BINDING_ERROR"
-)
-const (
-	MsgBindingTypeError     = "binding.type_error"
-	MsgBindingValidateError = "binding.Validate_error"
-	MsgBindingError         = "Binding.error"
+	"net/http"
 )
 
 type BaseApi struct {
-	Ctx    *gin.Context
-	Errors error
-	Logger *zap.Logger
+	Ctx     *gin.Context
+	Logger  *zap.Logger
+	aborted bool
 }
 
-func NewBaseApi() BaseApi {
-	return BaseApi{
+func NewBaseApi() *BaseApi {
+	return &BaseApi{
 		Logger: global.Logger,
 	}
 }
 
-type BuildRequestOption struct {
-	Ctx               *gin.Context
+type BindDataOption struct {
 	DTO               any
 	BindParamsFromUri bool
 }
 
-func (m *BaseApi) BuildRequest(option BuildRequestOption) *BaseApi {
-	var errBinding error
-	/*===========================================================================================*/
-	//綁定請求上下文
-	m.Ctx = option.Ctx
+func Build(c *gin.Context) *BaseApi {
+	return NewBaseApi().BuildRequest(c)
+}
 
-	/*===========================================================================================*/
-	//綁定請求的數據
-	if option.DTO != nil {
-		if option.BindParamsFromUri {
-			errBinding = m.Ctx.ShouldBindUri(option.DTO)
-		} else {
-			errBinding = m.Ctx.ShouldBind(option.DTO)
-		}
-		/*===========================================================================================*/
-		//如果嘗試綁定資料時發生錯誤
-		if errBinding != nil {
-			m.SetError(errBinding)
-			//先創建一個要回傳的物件 錯誤代碼用400
-			response := ResponseJson{Status: 400}
-
-			//如果是Json轉型錯誤
-			var typeErr *json.UnmarshalTypeError
-			if errors.As(errBinding, &typeErr) {
-				m.Logger.Info(ErrBindingType, zap.String("request_id", m.GetRequestID()), zap.Error(errBinding))
-				response.Code = ErrBindingType
-				response.Msg = MsgBindingTypeError
-				response.Data = gin.H{
-					"field":    typeErr.Field,
-					"expected": typeErr.Type.String(),
-					"value":    typeErr.Value,
-				}
-				return m.Fail(response)
-			}
-
-			//如果是資料驗證錯誤
-			var validationErr validator.ValidationErrors
-			if errors.As(errBinding, &validationErr) {
-				m.Logger.Info(ErrBindingValidate, zap.String("request_id", m.GetRequestID()), zap.Error(errBinding))
-				allValidationErrors := make([]gin.H, 0)
-				for _, ve := range validationErr {
-					allValidationErrors = append(allValidationErrors, gin.H{
-						"field": ve.Field(),
-						"rule":  ve.Tag(),
-						"param": ve.Param(),
-					})
-				}
-				response.Code = ErrBindingValidate
-				response.Msg = MsgBindingValidateError
-				response.Data = allValidationErrors
-				return m.Fail(response)
-			}
-
-			//其他錯誤
-			m.Logger.Warn(ErrBinding, zap.String("request_id", m.GetRequestID()), zap.Error(errBinding))
-			response.Code = ErrBinding
-			response.Msg = MsgBindingError
-
-			return m.Fail(response)
-		}
-
-	}
+func (m *BaseApi) BuildRequest(c *gin.Context) *BaseApi {
+	//綁定上下文
+	m.Ctx = c
 	return m
 }
 
-func (m *BaseApi) SetError(errNew error) {
-	m.Errors = utils.AppendError(m.Errors, errNew)
+func (m *BaseApi) Bind(option BindDataOption) *BaseApi {
+	if option.DTO == nil {
+		return m
+	}
+
+	// 綁定數據 (僅在 DTO 不為 nil 時執行)
+	var errBinding error
+	if option.BindParamsFromUri {
+		errBinding = m.Ctx.ShouldBindUri(option.DTO)
+	} else {
+		errBinding = m.Ctx.ShouldBind(option.DTO)
+	}
+
+	if errBinding != nil {
+		m.handleBindingError(errBinding)
+	}
+
+	return m
 }
 
-func (m *BaseApi) GetError() error {
-	return m.Errors
+func (m *BaseApi) handleBindingError(errBinding error) {
+	m.aborted = true
+	response := ResponseJson{Status: http.StatusBadRequest}
+
+	// JSON 型態錯誤
+	var typeErr *json.UnmarshalTypeError
+	if errors.As(errBinding, &typeErr) {
+		global.Logger.Info(consts.ErrBindingType, zap.String("request_id", m.RequestID()), zap.Error(errBinding))
+		response.Code = consts.ErrBindingType
+		response.Msg = consts.MsgBindingTypeError
+		response.Data = gin.H{"field": typeErr.Field, "expected": typeErr.Type.String()}
+		m.Fail(response)
+		return
+	}
+
+	// 驗證錯誤
+	var validationErr validator.ValidationErrors
+	if errors.As(errBinding, &validationErr) {
+		global.Logger.Info(consts.ErrBindingValidate, zap.String("request_id", m.RequestID()), zap.Error(errBinding))
+		errorsDetail := make([]gin.H, 0)
+		for _, ve := range validationErr {
+			errorsDetail = append(errorsDetail, gin.H{"field": ve.Field(), "rule": ve.Tag()})
+		}
+		response.Code = consts.ErrBindingValidate
+		response.Msg = consts.MsgBindingValidateError
+		response.Data = errorsDetail
+		m.Fail(response)
+		return
+	}
+
+	// 其他錯誤
+	global.Logger.Warn(consts.ErrBinding, zap.String("request_id", m.RequestID()), zap.Error(errBinding))
+	response.Code = consts.ErrBinding
+	response.Msg = consts.MsgBindingError
+	m.Fail(response)
+	return
 }
 
-func (m *BaseApi) GetRequestID() string {
+func (m *BaseApi) GetUserId() (IsLogin bool, userId uuid.UUID) {
+	isLogin, ok := m.Ctx.Get("isLogin")
+	if !ok || isLogin != true {
+		return false, uuid.Nil
+	}
+	userIdStr, ok := m.Ctx.Get("userId")
+	if !ok {
+		return false, uuid.Nil
+	}
+	userId, err := uuid.Parse(userIdStr.(string))
+	if err != nil {
+		return false, uuid.Nil
+	}
+	return true, userId
+}
+
+func (m *BaseApi) HasError() bool {
+	return m.aborted
+}
+
+func (m *BaseApi) Context() context.Context {
+	return m.Ctx.Request.Context()
+}
+
+func (m *BaseApi) RequestID() string {
 	return m.Ctx.GetString("request_id")
 }
 
-//func (m *BaseApi) ParseValidateErrors(errs validator.ValidationErrors, target any) error {
-//	var errResult error
-//
-//	var errValidation validator.ValidationErrors
-//	ok := errors.As(errs, &errValidation)
-//	//如果不是驗證的錯誤   就直接把錯誤說明返回
-//	if !ok {
-//		return errs
-//	}
-//
-//	//通過反射獲取指針指向元素指定類型對象
-//	fields := reflect.TypeOf(target).Elem()
-//
-//	for _, fieldErr := range errValidation {
-//		//驗證發生錯誤的對象
-//		field, _ := fields.FieldByName(fieldErr.Field())
-//		//自定義的驗證錯誤訊息標籤
-//		errMessageTag := fmt.Sprintf("%s_err", fieldErr.Tag())
-//		//取得對應的錯誤訊息
-//		errMessage := field.Tag.Get(errMessageTag)
-//
-//		if errMessage == "" {
-//			//如果拿不到自定義的錯誤訊息  嘗試拿取message的錯誤訊息標籤(統一的錯誤訊息)
-//			errMessage = field.Tag.Get("message")
-//		}
-//
-//		if errMessage == "" {
-//			//如果還是取不到錯誤訊息 就產生一個預設的錯誤訊息格式
-//			errMessage = fmt.Sprintf("%s: %s Error (Validate fail)", fieldErr.Field(), fieldErr.Tag())
-//		}
-//
-//		errResult = utils.AppendError(errResult, errors.New(errMessage))
-//
-//	}
-//	return errResult
-//}
-
-func (m *BaseApi) OK(resp ResponseJson) *BaseApi {
+func (m *BaseApi) OK(resp ResponseJson) {
 	OK(m.Ctx, resp)
-	return m
 }
 
-func (m *BaseApi) Fail(resp ResponseJson) *BaseApi {
+func (m *BaseApi) Fail(resp ResponseJson) {
 	Fail(m.Ctx, resp)
-	return m
 }
 
-func (m *BaseApi) ServerFail(resp ResponseJson) *BaseApi {
+func (m *BaseApi) ServerFail(resp ResponseJson) {
 	ServerFail(m.Ctx, resp)
-	return m
 }
